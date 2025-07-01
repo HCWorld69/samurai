@@ -56,7 +56,7 @@ def split_list(video_list, num_chunks):
     chunk_size = len(video_list) // num_chunks
     return [video_list[i:i+chunk_size] for i in range(0, len(video_list), chunk_size)]
 
-def inference_chunk(dataset_path, tracker_name, model_name, chunk_videos, result_folder):
+def inference_chunk(dataset_path, tracker_name, model_name, chunk_videos, result_folder, device):
     exp_name = "test"
 
     model_ckpt, model_cfg = get_ckpt_and_cfg(tracker_name, model_name)
@@ -72,12 +72,13 @@ def inference_chunk(dataset_path, tracker_name, model_name, chunk_videos, result
 
         logger.info(f"Running video [{vid+1}/{len(chunk_videos)}]: {video} with {num_frames} frames ({height}x{width})")
 
-        predictor = build_sam2_video_predictor(model_cfg, model_ckpt, device="cuda:0")
+        predictor = build_sam2_video_predictor(model_cfg, model_ckpt, device=str(device))
 
         predictions = []
 
         # Start processing frames
-        with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
+        autocast_dtype = torch.float16 if device.type == "cuda" else torch.float32
+        with torch.inference_mode(), torch.autocast(device.type, dtype=autocast_dtype):
             state = predictor.init_state(frame_folder, offload_video_to_cpu=True, offload_state_to_cpu=True)
 
             prompts = load_gt(osp.join(dataset_path, cat_name, video.strip(), "groundtruth.txt"))
@@ -126,6 +127,7 @@ def main():
     parser.add_argument("--num_chunks", type=int, default=1)
     parser.add_argument("--exp_name", type=str, default="test")
     parser.add_argument("--root_result_folder", type=str, default="results")
+    parser.add_argument("--device", default=None, help="Computation device, defaults to CUDA if available")
     args = parser.parse_args()
 
     test_videos = load_test_video_list("data/LaSOT-ext/testing_set.txt")
@@ -137,7 +139,9 @@ def main():
 
     exp_result_folder = osp.join(args.root_result_folder, args.tracker_name, f"{args.exp_name}_{args.model_name}")
 
-    inference_chunk(args.dataset_path, args.tracker_name, args.model_name, chunk_videos, exp_result_folder)
+    device = torch.device(args.device if args.device else ("cuda" if torch.cuda.is_available() else "cpu"))
+
+    inference_chunk(args.dataset_path, args.tracker_name, args.model_name, chunk_videos, exp_result_folder, device)
 
 if __name__ == "__main__":
     main()

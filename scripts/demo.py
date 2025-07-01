@@ -40,8 +40,9 @@ def prepare_frames_or_path(video_path):
         raise ValueError("Invalid video_path format. Should be .mp4 or a directory of jpg frames.")
 
 def main(args):
+    device = torch.device(args.device if args.device else ("cuda" if torch.cuda.is_available() else "cpu"))
     model_cfg = determine_model_cfg(args.model_path)
-    predictor = build_sam2_video_predictor(model_cfg, args.model_path, device="cuda:0")
+    predictor = build_sam2_video_predictor(model_cfg, args.model_path, device=str(device))
     frames_or_path = prepare_frames_or_path(args.video_path)
     prompts = load_txt(args.txt_path)
 
@@ -69,7 +70,8 @@ def main(args):
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(args.video_output_path, fourcc, frame_rate, (width, height))
 
-    with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
+    autocast_dtype = torch.float16 if device.type == "cuda" else torch.float32
+    with torch.inference_mode(), torch.autocast(device.type, dtype=autocast_dtype):
         state = predictor.init_state(frames_or_path, offload_video_to_cpu=True)
         bbox, track_label = prompts[0]
         _, _, masks = predictor.add_new_points_or_box(state, box=bbox, frame_idx=0, obj_id=0)
@@ -118,5 +120,6 @@ if __name__ == "__main__":
     parser.add_argument("--model_path", default="sam2/checkpoints/sam2.1_hiera_base_plus.pt", help="Path to the model checkpoint.")
     parser.add_argument("--video_output_path", default="demo.mp4", help="Path to save the output video.")
     parser.add_argument("--save_to_video", default=True, help="Save results to a video.")
+    parser.add_argument("--device", default=None, help="Computation device, e.g. 'cuda:0' or 'cpu'. Defaults to CUDA if available.")
     args = parser.parse_args()
     main(args)
