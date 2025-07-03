@@ -104,6 +104,29 @@ python scripts/demo.py --video_path <your_video.mp4> --txt_path <path_to_first_f
 python scripts/demo.py --video_path <your_frame_directory> --txt_path <path_to_first_frame_bbox.txt>
 ```
 
+## GPU & Video Demo
+
+This repository provides a small script to quickly try SAMURAI on a local video.
+
+### Prerequisites
+
+- CUDA capable GPU with drivers installed (optional but recommended)
+- Python >=3.10 with `torch`, `torchvision`, `opencv-python` and SAMURAI's extras
+
+### Interactive bounding box selection
+
+Run the following command and a window will open showing the first frame of the
+video. Use the mouse to draw a bounding box around the object of interest and
+close the window.
+
+```bash
+python scripts/gpu_video_demo.py --video_path <path/to/myvid1.mp4>
+```
+
+The script automatically detects if a CUDA GPU is available and will print
+`Using GPU` or `Using CPU` accordingly. It then runs segmentation on the first
+six frames and prints their processing times.
+
 ## FAQs
 **Question 1:** Does SAMURAI need training? [issue 34](https://github.com/yangchris11/samurai/issues/34)
 
